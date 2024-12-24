@@ -2,14 +2,24 @@ export default class GameScene extends Phaser.Scene {
     constructor() {
         super({ key: 'GameScene' });
         this.score = 0;
+        this.level = 1;
+        this.difficultyMultiplier = 1;
+        this.scoreToNextLevel = 1000;
+        this.consecutiveCorrect = 0;
         this.currentProblem = null;
         this.bullets = [];
         this.fallingAnswers = [];
         this.stars = [];
+        this.powerUps = [];
         this.lastShootTime = 0;
         this.shootDelay = 500; // Minimum time between shots in milliseconds
         this.lastAnswerSpawnTime = 0;
         this.answerSpawnDelay = 2000; // Spawn new answer every 2 seconds
+        this.activePowerUps = {
+            multishot: { active: false, duration: 0 },
+            slowmo: { active: false, duration: 0 },
+            shield: { active: false, duration: 0 }
+        };
     }
 
     init(data) {
@@ -24,6 +34,7 @@ export default class GameScene extends Phaser.Scene {
         this.generateBulletTexture();
         this.generateAnswerBubbleTexture();
         this.generateParticleTexture();
+        this.generatePowerUpTextures();
     }
 
     generateShipTexture() {
@@ -112,6 +123,49 @@ export default class GameScene extends Phaser.Scene {
         
         graphics.generateTexture('particle', 8, 8);
         graphics.destroy();
+    }
+
+    generatePowerUpTextures() {
+        // Multishot power-up
+        const multishotGraphics = this.add.graphics();
+        multishotGraphics.lineStyle(2, 0xffff00);
+        multishotGraphics.fillStyle(0xffff00, 1);
+        multishotGraphics.beginPath();
+        multishotGraphics.moveTo(0, -10);
+        multishotGraphics.lineTo(10, 10);
+        multishotGraphics.lineTo(-10, 10);
+        multishotGraphics.closePath();
+        multishotGraphics.strokePath();
+        multishotGraphics.fillPath();
+        multishotGraphics.generateTexture('multishot', 20, 20);
+        multishotGraphics.destroy();
+
+        // Slow-mo power-up
+        const slowmoGraphics = this.add.graphics();
+        slowmoGraphics.lineStyle(2, 0x00ffff);
+        slowmoGraphics.fillStyle(0x00ffff, 1);
+        slowmoGraphics.beginPath();
+        slowmoGraphics.arc(0, 0, 10, 0, Math.PI * 2);
+        slowmoGraphics.closePath();
+        slowmoGraphics.strokePath();
+        slowmoGraphics.fillPath();
+        slowmoGraphics.generateTexture('slowmo', 20, 20);
+        slowmoGraphics.destroy();
+
+        // Shield power-up
+        const shieldGraphics = this.add.graphics();
+        shieldGraphics.lineStyle(2, 0xff00ff);
+        shieldGraphics.fillStyle(0xff00ff, 1);
+        shieldGraphics.beginPath();
+        shieldGraphics.moveTo(0, -10);
+        shieldGraphics.lineTo(10, 0);
+        shieldGraphics.lineTo(0, 10);
+        shieldGraphics.lineTo(-10, 0);
+        shieldGraphics.closePath();
+        shieldGraphics.strokePath();
+        shieldGraphics.fillPath();
+        shieldGraphics.generateTexture('shield', 20, 20);
+        shieldGraphics.destroy();
     }
 
     generateMathProblem() {
@@ -368,6 +422,77 @@ export default class GameScene extends Phaser.Scene {
         this.fallingAnswers.push(fallingAnswer);
     }
 
+    spawnPowerUp() {
+        const powerUpTypes = ['multishot', 'slowmo', 'shield'];
+        const type = powerUpTypes[Phaser.Math.Between(0, powerUpTypes.length - 1)];
+        const x = Phaser.Math.Between(50, this.game.config.width - 50);
+        
+        const powerUp = this.add.sprite(x, -20, type);
+        powerUp.type = type;
+        powerUp.speed = Phaser.Math.Between(50, 100);
+        
+        // Add glow effect
+        const particles = this.add.particles(x, -20, 'particle', {
+            speed: { min: 20, max: 40 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 0.2, end: 0 },
+            lifespan: 1000,
+            quantity: 1,
+            frequency: 50,
+            tint: type === 'multishot' ? 0xffff00 : type === 'slowmo' ? 0x00ffff : 0xff00ff
+        });
+        
+        powerUp.particles = particles;
+        this.powerUps.push(powerUp);
+    }
+
+    activatePowerUp(type) {
+        const duration = 10000; // 10 seconds
+        this.activePowerUps[type].active = true;
+        this.activePowerUps[type].duration = duration;
+        
+        // Visual feedback
+        const text = type.charAt(0).toUpperCase() + type.slice(1);
+        const powerUpText = this.add.text(640, 200, `${text} Activated!`, {
+            fontSize: '32px',
+            fill: type === 'multishot' ? '#ffff00' : type === 'slowmo' ? '#00ffff' : '#ff00ff',
+            fontFamily: 'Arial',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        
+        this.tweens.add({
+            targets: powerUpText,
+            y: 150,
+            alpha: 0,
+            duration: 1000,
+            ease: 'Power2',
+            onComplete: () => powerUpText.destroy()
+        });
+        
+        // Create power-up icon
+        const icon = this.add.sprite(50 + Object.keys(this.activePowerUps).indexOf(type) * 40, 150, type)
+            .setScale(1.5);
+        
+        // Add timer bar under icon
+        const timerBar = this.add.rectangle(icon.x, icon.y + 20, 30, 4, 0xffffff);
+        const timerMask = this.add.rectangle(icon.x, icon.y + 20, 30, 4, 0xffffff);
+        timerBar.mask = new Phaser.Display.Masks.GeometryMask(this, timerMask);
+        
+        // Animate timer bar
+        this.tweens.add({
+            targets: timerMask,
+            scaleX: 0,
+            duration: duration,
+            ease: 'Linear',
+            onComplete: () => {
+                icon.destroy();
+                timerBar.destroy();
+                timerMask.destroy();
+            }
+        });
+    }
+
     create() {
         // Create starfield background
         this.createStarfield();
@@ -394,10 +519,22 @@ export default class GameScene extends Phaser.Scene {
         this.currentProblem = this.generateMathProblem();
         this.problemText.setText(this.currentProblem.question);
         
-        // Display score
-        this.scoreText = this.add.text(50, 50, 'Score: 0', {
+        // Display score and level
+        this.scoreText = this.add.text(50, 30, 'Score: 0', {
             fontSize: '24px',
             fill: '#ffffff',
+            fontFamily: 'Arial'
+        });
+        
+        this.levelText = this.add.text(50, 70, 'Level: 1', {
+            fontSize: '24px',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        });
+
+        this.nextLevelText = this.add.text(50, 110, 'Next Level: 1000', {
+            fontSize: '20px',
+            fill: '#88ff88',
             fontFamily: 'Arial'
         });
 
@@ -488,16 +625,25 @@ export default class GameScene extends Phaser.Scene {
     shoot() {
         const currentTime = this.time.now;
         if (currentTime - this.lastShootTime >= this.shootDelay) {
-            // Create bullet
-            const bullet = this.add.sprite(this.playerShip.x, this.playerShip.y - 30, 'bullet')
-                .setScale(1)
-                .setOrigin(0.5);
+            if (this.activePowerUps.multishot.active) {
+                // Shoot 3 bullets in a spread pattern
+                for (let i = -1; i <= 1; i++) {
+                    const bullet = this.add.sprite(this.playerShip.x + (i * 20), this.playerShip.y - 30, 'bullet')
+                        .setScale(1)
+                        .setOrigin(0.5);
+                    bullet.speed = 400;
+                    this.bullets.push(bullet);
+                }
+            } else {
+                const bullet = this.add.sprite(this.playerShip.x, this.playerShip.y - 30, 'bullet')
+                    .setScale(1)
+                    .setOrigin(0.5);
+                bullet.speed = 400;
+                this.bullets.push(bullet);
+            }
             
-            bullet.speed = 400;
-            this.bullets.push(bullet);
             this.lastShootTime = currentTime;
 
-            // Create shooting particles
             const particles = this.add.particles(this.playerShip.x, this.playerShip.y - 20, 'particle', {
                 speed: { min: 50, max: 100 },
                 angle: { min: 260, max: 280 },
@@ -507,12 +653,10 @@ export default class GameScene extends Phaser.Scene {
                 tint: 0x00ff00
             });
 
-            // Clean up particles after animation
             this.time.delayedCall(200, () => {
                 particles.destroy();
             });
 
-            // Add camera shake for feedback
             this.cameras.main.shake(50, 0.002);
         }
     }
@@ -532,6 +676,43 @@ export default class GameScene extends Phaser.Scene {
             if (star.y > this.game.config.height) {
                 star.y = 0;
                 star.x = Phaser.Math.Between(0, this.game.config.width);
+            }
+        }
+
+        // Update power-ups
+        for (let i = this.powerUps.length - 1; i >= 0; i--) {
+            const powerUp = this.powerUps[i];
+            const speedMultiplier = this.activePowerUps.slowmo.active ? 0.5 : 1;
+            powerUp.y += powerUp.speed * speedMultiplier * this.game.loop.delta / 1000;
+            powerUp.particles.setPosition(powerUp.x, powerUp.y);
+            
+            if (powerUp.y > this.game.config.height + 20) {
+                powerUp.particles.destroy();
+                powerUp.destroy();
+                this.powerUps.splice(i, 1);
+                continue;
+            }
+            
+            // Check collision with player
+            const dx = this.playerShip.x - powerUp.x;
+            const dy = this.playerShip.y - powerUp.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < 40) {
+                this.activatePowerUp(powerUp.type);
+                powerUp.particles.destroy();
+                powerUp.destroy();
+                this.powerUps.splice(i, 1);
+            }
+        }
+        
+        // Update power-up durations
+        for (const [type, powerUp] of Object.entries(this.activePowerUps)) {
+            if (powerUp.active) {
+                powerUp.duration -= this.game.loop.delta;
+                if (powerUp.duration <= 0) {
+                    powerUp.active = false;
+                }
             }
         }
 
@@ -558,17 +739,29 @@ export default class GameScene extends Phaser.Scene {
                 if (this.checkCollision(bullet, answer)) {
                     // Handle hit
                     if (answer.isCorrect) {
-                        this.score += 100;
-                        this.scoreText.setText(`Score: ${this.score}`);
-                        this.createSuccessEffect(answer.text.x, answer.text.y);
+                        this.consecutiveCorrect++;
+                        const baseScore = 100;
+                        const bonusMultiplier = Math.min(2, 1 + (this.consecutiveCorrect * 0.1));
+                        const levelBonus = Math.floor(baseScore * (this.level * 0.1));
+                        const totalScore = Math.floor((baseScore + levelBonus) * bonusMultiplier);
                         
-                        // Generate new problem
+                        this.score += totalScore;
+                        this.scoreText.setText(`Score: ${this.score}`);
+                        
+                        // Check for level up
+                        if (this.score >= this.scoreToNextLevel) {
+                            this.levelUp();
+                        }
+                        
+                        this.createSuccessEffect(answer.text.x, answer.text.y);
                         this.currentProblem = this.generateMathProblem();
                         this.problemText.setText(this.currentProblem.question);
-                        
-                        // Clear all answers
                         this.clearAllAnswers();
+                        
+                        // Update next level progress
+                        this.nextLevelText.setText(`Next Level: ${this.scoreToNextLevel - this.score}`);
                     } else {
+                        this.consecutiveCorrect = 0;
                         this.score = Math.max(0, this.score - 50);
                         this.scoreText.setText(`Score: ${this.score}`);
                         this.createFailureEffect(answer.text.x, answer.text.y);
@@ -588,18 +781,18 @@ export default class GameScene extends Phaser.Scene {
             }
         }
 
-        // Update falling answers
+        // Update falling answers with difficulty-based speed
         for (let i = this.fallingAnswers.length - 1; i >= 0; i--) {
             const answer = this.fallingAnswers[i];
-            answer.text.y += answer.speed * this.game.loop.delta / 1000;
+            const speedMultiplier = 1 + (this.level * 0.1);
+            answer.text.y += (answer.speed * speedMultiplier) * this.game.loop.delta / 1000;
             
             // Remove answers that fall off screen
             if (answer.text.y > this.game.config.height + 30) {
                 if (answer.isCorrect) {
-                    // Player missed the correct answer
+                    this.consecutiveCorrect = 0;
                     this.currentProblem = this.generateMathProblem();
                     this.problemText.setText(this.currentProblem.question);
-                    // Optional: Add penalty to score
                     this.score = Math.max(0, this.score - 50);
                     this.scoreText.setText(`Score: ${this.score}`);
                 }
@@ -622,6 +815,11 @@ export default class GameScene extends Phaser.Scene {
         }
         if (this.playerShip.x > 1230) {
             this.playerShip.x = 1230;
+        }
+
+        // Spawn power-ups occasionally
+        if (Phaser.Math.Between(0, 1000) < 5) { // 0.5% chance per frame
+            this.spawnPowerUp();
         }
     }
 
@@ -701,5 +899,38 @@ export default class GameScene extends Phaser.Scene {
             }
             this.lastAnswerSpawnTime = currentTime;
         }
+    }
+
+    levelUp() {
+        this.level++;
+        this.levelText.setText(`Level: ${this.level}`);
+        this.scoreToNextLevel = this.scoreToNextLevel + (1000 * this.level);
+        this.nextLevelText.setText(`Next Level: ${this.scoreToNextLevel - this.score}`);
+        
+        // Visual feedback for level up
+        this.cameras.main.flash(500, 0, 255, 0);
+        this.cameras.main.shake(500, 0.005);
+        
+        // Create level up text animation
+        const levelUpText = this.add.text(640, 360, 'LEVEL UP!', {
+            fontSize: '64px',
+            fill: '#00ff00',
+            fontFamily: 'Arial',
+            stroke: '#000000',
+            strokeThickness: 6
+        }).setOrigin(0.5);
+        
+        this.tweens.add({
+            targets: levelUpText,
+            y: 260,
+            alpha: 0,
+            duration: 1000,
+            ease: 'Power2',
+            onComplete: () => levelUpText.destroy()
+        });
+        
+        // Adjust game difficulty
+        this.difficultyMultiplier = 1 + (this.level * 0.1);
+        this.answerSpawnDelay = Math.max(1000, 2000 - (this.level * 100));
     }
 }
