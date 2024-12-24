@@ -163,11 +163,151 @@ export default class GameScene extends Phaser.Scene {
                 }
                 break;
 
+            case 'Decimals':
+                const decimalOps = ['add', 'subtract', 'multiply', 'divide'];
+                const decimalOp = decimalOps[Phaser.Math.Between(0, decimalOps.length - 1)];
+                
+                if (decimalOp === 'add' || decimalOp === 'subtract') {
+                    const dec1 = (Phaser.Math.Between(1, 100) / 10).toFixed(1);
+                    const dec2 = (Phaser.Math.Between(1, 100) / 10).toFixed(1);
+                    problem = decimalOp === 'add' ? 
+                        `${dec1} + ${dec2} = ?` :
+                        `${dec1} - ${dec2} = ?`;
+                    answer = decimalOp === 'add' ? 
+                        (parseFloat(dec1) + parseFloat(dec2)).toFixed(1) :
+                        (parseFloat(dec1) - parseFloat(dec2)).toFixed(1);
+                } else if (decimalOp === 'multiply') {
+                    const dec1 = (Phaser.Math.Between(1, 10) / 10).toFixed(1);
+                    const dec2 = Phaser.Math.Between(2, 10);
+                    problem = `${dec1} × ${dec2} = ?`;
+                    answer = (parseFloat(dec1) * dec2).toFixed(1);
+                } else {
+                    const divisor = Phaser.Math.Between(2, 5);
+                    const dividend = (Phaser.Math.Between(1, 10) * divisor) / 10;
+                    problem = `${dividend.toFixed(1)} ÷ ${divisor} = ?`;
+                    answer = (dividend / divisor).toFixed(1);
+                }
+                break;
+
+            case 'Geometry':
+                const shapes = ['rectangle', 'triangle', 'circle'];
+                const shape = shapes[Phaser.Math.Between(0, shapes.length - 1)];
+                const geometryOps = ['area', 'perimeter'];
+                const geometryOp = geometryOps[Phaser.Math.Between(0, geometryOps.length - 1)];
+                
+                if (shape === 'rectangle') {
+                    const length = Phaser.Math.Between(3, 12);
+                    const width = Phaser.Math.Between(3, 12);
+                    problem = geometryOp === 'area' ?
+                        `Find the area of a rectangle with length ${length} and width ${width}.` :
+                        `Find the perimeter of a rectangle with length ${length} and width ${width}.`;
+                    answer = geometryOp === 'area' ?
+                        length * width :
+                        2 * (length + width);
+                } else if (shape === 'triangle') {
+                    const base = Phaser.Math.Between(3, 12);
+                    const height = Phaser.Math.Between(3, 12);
+                    if (geometryOp === 'area') {
+                        problem = `Find the area of a triangle with base ${base} and height ${height}.`;
+                        answer = (base * height / 2).toFixed(1);
+                    } else {
+                        // Using an equilateral triangle for perimeter to keep it simple
+                        problem = `Find the perimeter of an equilateral triangle with side length ${base}.`;
+                        answer = base * 3;
+                    }
+                } else {
+                    const radius = Phaser.Math.Between(2, 8);
+                    problem = geometryOp === 'area' ?
+                        `Find the area of a circle with radius ${radius}. (Use π = 3.14)` :
+                        `Find the circumference of a circle with radius ${radius}. (Use π = 3.14)`;
+                    answer = geometryOp === 'area' ?
+                        (Math.PI * radius * radius).toFixed(1) :
+                        (2 * Math.PI * radius).toFixed(1);
+                }
+                break;
+
             case 'Basic Algebra':
                 const x = Phaser.Math.Between(1, 10);
                 const b = Phaser.Math.Between(1, 20);
                 problem = `x + ${b} = ${x + b}`;
                 answer = x;
+                break;
+
+            case 'Advanced Algebra':
+                const algebraOps = ['quadratic', 'exponential', 'logarithmic'];
+                const algebraOp = algebraOps[Phaser.Math.Between(0, algebraOps.length - 1)];
+                
+                if (algebraOp === 'quadratic') {
+                    const x = Phaser.Math.Between(-5, 5);
+                    const a = Phaser.Math.Between(1, 3);
+                    const c = Phaser.Math.Between(-5, 5);
+                    problem = `If ${a}x² + ${c} = 0, what is one value of x?`;
+                    answer = x;
+                } else if (algebraOp === 'exponential') {
+                    const base = Phaser.Math.Between(2, 4);
+                    const exponent = Phaser.Math.Between(1, 3);
+                    problem = `${base}ˣ = ${Math.pow(base, exponent)}`;
+                    answer = exponent;
+                } else {
+                    const base = 2;
+                    const x = Phaser.Math.Between(1, 4);
+                    problem = `log₂(${Math.pow(2, x)}) = ?`;
+                    answer = x;
+                }
+                break;
+
+            case 'Trigonometry':
+                const angles = [0, 30, 45, 60, 90];
+                const angle = angles[Phaser.Math.Between(0, angles.length - 1)];
+                const trigFunctions = ['sin', 'cos', 'tan'];
+                const trigFunction = trigFunctions[Phaser.Math.Between(0, trigFunctions.length - 1)];
+                
+                problem = `${trigFunction}(${angle}°) = ?`;
+                if (trigFunction === 'sin') {
+                    answer = Math.sin(angle * Math.PI / 180).toFixed(2);
+                } else if (trigFunction === 'cos') {
+                    answer = Math.cos(angle * Math.PI / 180).toFixed(2);
+                } else {
+                    if (angle === 90) {
+                        answer = 'undefined';
+                    } else {
+                        answer = Math.tan(angle * Math.PI / 180).toFixed(2);
+                    }
+                }
+                break;
+
+            case 'Probability':
+                const probTypes = ['coin', 'dice', 'cards'];
+                const probType = probTypes[Phaser.Math.Between(0, probTypes.length - 1)];
+                
+                if (probType === 'coin') {
+                    const flips = Phaser.Math.Between(2, 4);
+                    problem = `Probability of getting all heads in ${flips} coin flips = ?`;
+                    answer = `1/${Math.pow(2, flips)}`;
+                } else if (probType === 'dice') {
+                    problem = 'Probability of rolling a 6 on a fair die = ?';
+                    answer = '1/6';
+                } else {
+                    problem = 'Probability of drawing a heart from a standard deck = ?';
+                    answer = '13/52';
+                }
+                break;
+
+            case 'Statistics':
+                const numbers = Array.from({length: 5}, () => Phaser.Math.Between(1, 20));
+                const statTypes = ['mean', 'median', 'mode'];
+                const statType = statTypes[Phaser.Math.Between(0, statTypes.length - 1)];
+                
+                problem = `Find the ${statType} of: ${numbers.join(', ')}`;
+                if (statType === 'mean') {
+                    answer = (numbers.reduce((a, b) => a + b) / numbers.length).toFixed(1);
+                } else if (statType === 'median') {
+                    const sorted = numbers.sort((a, b) => a - b);
+                    answer = sorted[Math.floor(sorted.length / 2)];
+                } else {
+                    const mode = numbers.reduce((a, b) => (a[b] = (a[b] || 0) + 1, a), {});
+                    answer = Object.entries(mode).reduce((a, b) => mode[a] > mode[b] ? a : b);
+                }
                 break;
 
             default:
