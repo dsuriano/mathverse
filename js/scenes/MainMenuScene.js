@@ -25,8 +25,8 @@ export default class MainMenuScene extends Phaser.Scene {
 
         // Create menu buttons
         this.createButton(640, 300, 'Single Player', () => this.scene.start('LevelSelectScene', { mode: 'single' }));
-        this.createButton(640, 380, 'Multiplayer', () => this.scene.start('LevelSelectScene', { mode: 'multi' }));
-        this.createButton(640, 460, 'Tutorial', () => this.scene.start('TutorialScene'));
+        // this.createButton(640, 380, 'Multiplayer', () => this.scene.start('LevelSelectScene', { mode: 'multi' }));
+        // this.createButton(640, 460, 'Tutorial', () => this.scene.start('TutorialScene'));
     }
 
     createButton(x, y, text, callback) {
