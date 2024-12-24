@@ -45,7 +45,7 @@ Simply open the `index.html` file in your web browser! No server required.
 
 ### Play Online
 
-You can play MathVerse online at: https://david.github.io/mathverse/
+You can play MathVerse online at: https://dsuriano.github.io/mathverse/
 
 ## How to Play
 
