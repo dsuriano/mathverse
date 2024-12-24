@@ -1,11 +1,16 @@
-export default class LevelSelectScene extends Phaser.Scene {
+export default class TopicSelectScene extends Phaser.Scene {
     constructor() {
-        super({ key: 'LevelSelectScene' });
-        this.difficulties = ['Elementary', 'Middle School', 'High School'];
+        super({ key: 'TopicSelectScene' });
+        this.topics = {
+            'Elementary': ['Addition', 'Subtraction', 'Multiplication', 'Division'],
+            'Middle School': ['Fractions', 'Decimals', 'Basic Algebra', 'Geometry'],
+            'High School': ['Advanced Algebra', 'Trigonometry', 'Probability', 'Statistics']
+        };
     }
 
     init(data) {
         this.gameMode = data.mode;
+        this.difficulty = data.difficulty;
     }
 
     create() {
@@ -15,7 +20,7 @@ export default class LevelSelectScene extends Phaser.Scene {
         bg.fillRect(0, 0, 1280, 720);
         
         // Add title with glow effect
-        const title = this.add.text(640, 80, 'Select Difficulty', {
+        const title = this.add.text(640, 80, `Select ${this.difficulty} Topic`, {
             fontSize: '48px',
             fill: '#ffffff',
             fontFamily: 'Arial',
@@ -32,22 +37,34 @@ export default class LevelSelectScene extends Phaser.Scene {
             ease: 'Sine.easeInOut'
         });
 
-        // Create buttons for each difficulty
-        this.difficulties.forEach((difficulty, index) => {
-            const y = 250 + index * 120;
+        // Create topic buttons
+        const topics = this.topics[this.difficulty];
+        const columns = 2;
+        const rows = Math.ceil(topics.length / columns);
+        const buttonWidth = 300;
+        const buttonHeight = 80;
+        const spacing = 40;
+        const startX = 640 - (buttonWidth + spacing) * (columns - 1) / 2;
+        const startY = 250;
+
+        topics.forEach((topic, index) => {
+            const row = Math.floor(index / columns);
+            const col = index % columns;
+            const x = startX + col * (buttonWidth + spacing);
+            const y = startY + row * (buttonHeight + spacing);
+
+            // Topic container
+            const container = this.add.container(x, y);
             
-            // Difficulty container
-            const container = this.add.container(640, y);
-            
-            // Difficulty button with gradient
+            // Topic button with gradient
             const button = this.add.graphics();
-            button.fillGradientStyle(0x4444ff, 0x4444ff, 0x2222aa, 0x2222aa, 0.8);
-            button.fillRoundedRect(-200, -40, 400, 80, 16);
+            button.fillGradientStyle(0x33aa33, 0x33aa33, 0x227722, 0x227722, 0.8);
+            button.fillRoundedRect(-buttonWidth/2, -buttonHeight/2, buttonWidth, buttonHeight, 16);
             container.add(button);
 
-            // Difficulty text
-            const text = this.add.text(0, 0, difficulty, {
-                fontSize: '32px',
+            // Topic text
+            const text = this.add.text(0, 0, topic, {
+                fontSize: '28px',
                 fill: '#ffffff',
                 fontFamily: 'Arial',
                 fontWeight: 'bold'
@@ -55,7 +72,7 @@ export default class LevelSelectScene extends Phaser.Scene {
             container.add(text);
 
             // Make container interactive
-            container.setSize(400, 80);
+            container.setSize(buttonWidth, buttonHeight);
             container.setInteractive()
                 .on('pointerover', () => {
                     this.tweens.add({
@@ -76,10 +93,7 @@ export default class LevelSelectScene extends Phaser.Scene {
                     });
                 })
                 .on('pointerdown', () => {
-                    this.scene.start('TopicSelectScene', { 
-                        mode: this.gameMode,
-                        difficulty: difficulty
-                    });
+                    this.startGame(topic);
                 });
         });
 
@@ -117,6 +131,16 @@ export default class LevelSelectScene extends Phaser.Scene {
                     duration: 200
                 });
             })
-            .on('pointerdown', () => this.scene.start('MainMenuScene'));
+            .on('pointerdown', () => {
+                this.scene.start('LevelSelectScene', { mode: this.gameMode });
+            });
+    }
+
+    startGame(topic) {
+        this.scene.start('GameScene', {
+            mode: this.gameMode,
+            difficulty: this.difficulty,
+            topic: topic
+        });
     }
 }
