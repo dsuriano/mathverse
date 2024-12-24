@@ -3,19 +3,20 @@ export default class GameScene extends Phaser.Scene {
         super({ key: 'GameScene' });
         this.score = 0;
         this.currentProblem = null;
-        this.fallingAnswers = [];
         this.bullets = [];
-        this.lastShootTime = 0;
-        this.shootDelay = 250; // Minimum time between shots in ms
+        this.fallingAnswers = [];
         this.stars = [];
+        this.lastShootTime = 0;
+        this.shootDelay = 500; // Minimum time between shots in milliseconds
         this.lastAnswerSpawnTime = 0;
         this.answerSpawnDelay = 2000; // Spawn new answer every 2 seconds
     }
 
     init(data) {
         this.gameMode = data.mode;
-        this.topic = data.topic;
+        this.topic = data.topic || 'Addition';
         this.difficulty = 1;
+        this.score = 0;
     }
 
     preload() {
@@ -114,30 +115,99 @@ export default class GameScene extends Phaser.Scene {
     }
 
     generateMathProblem() {
-        const num1 = Phaser.Math.Between(1, 10);
-        const num2 = Phaser.Math.Between(1, 10);
-        const operators = ['+', '-', '*'];
-        const operator = operators[Phaser.Math.Between(0, 2)];
-        
-        let answer;
-        switch(operator) {
-            case '+': answer = num1 + num2; break;
-            case '-': answer = num1 - num2; break;
-            case '*': answer = num1 * num2; break;
+        let problem = '';
+        let answer = 0;
+
+        switch(this.topic) {
+            case 'Addition':
+                const num1 = Phaser.Math.Between(1, 20 * this.difficulty);
+                const num2 = Phaser.Math.Between(1, 20 * this.difficulty);
+                problem = `${num1} + ${num2} = ?`;
+                answer = num1 + num2;
+                break;
+
+            case 'Subtraction':
+                const minuend = Phaser.Math.Between(10, 20 * this.difficulty);
+                const subtrahend = Phaser.Math.Between(1, minuend);
+                problem = `${minuend} - ${subtrahend} = ?`;
+                answer = minuend - subtrahend;
+                break;
+
+            case 'Multiplication':
+                const factor1 = Phaser.Math.Between(1, 12);
+                const factor2 = Phaser.Math.Between(1, 12);
+                problem = `${factor1} × ${factor2} = ?`;
+                answer = factor1 * factor2;
+                break;
+
+            case 'Division':
+                const divisor = Phaser.Math.Between(1, 12);
+                const quotient = Phaser.Math.Between(1, 12);
+                const dividend = divisor * quotient;
+                problem = `${dividend} ÷ ${divisor} = ?`;
+                answer = quotient;
+                break;
+
+            case 'Fractions':
+                const denom = Phaser.Math.Between(2, 12);
+                const numer1 = Phaser.Math.Between(1, denom);
+                const numer2 = Phaser.Math.Between(1, denom);
+                problem = `${numer1}/${denom} + ${numer2}/${denom} = ?`;
+                answer = numer1 + numer2;
+                if (answer > denom) {
+                    const whole = Math.floor(answer / denom);
+                    const remainder = answer % denom;
+                    answer = remainder === 0 ? whole : `${whole} ${remainder}/${denom}`;
+                } else {
+                    answer = `${answer}/${denom}`;
+                }
+                break;
+
+            case 'Basic Algebra':
+                const x = Phaser.Math.Between(1, 10);
+                const b = Phaser.Math.Between(1, 20);
+                problem = `x + ${b} = ${x + b}`;
+                answer = x;
+                break;
+
+            default:
+                // Default to addition if topic not implemented
+                const defaultNum1 = Phaser.Math.Between(1, 10);
+                const defaultNum2 = Phaser.Math.Between(1, 10);
+                problem = `${defaultNum1} + ${defaultNum2} = ?`;
+                answer = defaultNum1 + defaultNum2;
         }
-        
+
         return {
-            question: `${num1} ${operator} ${num2} = ?`,
+            question: problem,
             answer: answer
         };
     }
 
     generateWrongAnswer(correctAnswer) {
         let wrongAnswer;
-        do {
-            // Generate answer within ±5 of correct answer
-            wrongAnswer = correctAnswer + Phaser.Math.Between(-5, 5);
-        } while (wrongAnswer === correctAnswer || wrongAnswer < 0);
+        const isNumeric = typeof correctAnswer === 'number';
+        
+        if (isNumeric) {
+            do {
+                // Generate answer within ±5 of correct answer
+                wrongAnswer = correctAnswer + Phaser.Math.Between(-5, 5);
+            } while (wrongAnswer === correctAnswer || wrongAnswer < 0);
+        } else {
+            // Handle fraction answers
+            const fractionParts = correctAnswer.toString().split(' ');
+            if (fractionParts.length > 1) {
+                // Mixed number
+                const whole = parseInt(fractionParts[0]);
+                const fraction = fractionParts[1];
+                wrongAnswer = `${whole + Phaser.Math.Between(-1, 1)} ${fraction}`;
+            } else {
+                // Simple fraction
+                const [numer, denom] = correctAnswer.split('/').map(n => parseInt(n));
+                wrongAnswer = `${numer + Phaser.Math.Between(-2, 2)}/${denom}`;
+            }
+        }
+        
         return wrongAnswer;
     }
 
@@ -159,41 +229,79 @@ export default class GameScene extends Phaser.Scene {
     }
 
     create() {
-        // Set up physics world
-        // Removed physics world setup
-        
         // Create starfield background
         this.createStarfield();
         
         // Create player ship
-        this.createPlayer();
+        this.playerShip = this.add.sprite(640, 650, 'ship')
+            .setScale(0.8)
+            .setOrigin(0.5);
         
-        // Create UI elements
-        this.createUI();
+        // Setup keyboard input
+        this.cursors = this.input.keyboard.createCursorKeys();
         
-        // Generate first math problem
+        // Setup space key for shooting
+        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        
+        // Display current problem
+        this.problemText = this.add.text(640, 50, '', {
+            fontSize: '32px',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+        
+        // Generate first problem
         this.currentProblem = this.generateMathProblem();
         this.problemText.setText(this.currentProblem.question);
         
-        // Setup keyboard input
-        this.setupKeyboardInput();
+        // Display score
+        this.scoreText = this.add.text(50, 50, 'Score: 0', {
+            fontSize: '24px',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        });
+
+        // Add menu button
+        const menuButton = this.add.rectangle(1180, 50, 150, 40, 0x4444ff, 0.8)
+            .setInteractive()
+            .on('pointerover', () => menuButton.setFillStyle(0x6666ff, 0.8))
+            .on('pointerout', () => menuButton.setFillStyle(0x4444ff, 0.8))
+            .on('pointerdown', () => this.returnToMenu());
+
+        this.add.text(1180, 50, 'Menu', {
+            fontSize: '24px',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+
+        // Add ESC key handler
+        this.input.keyboard.on('keydown-ESC', () => this.returnToMenu());
+
+        // Add instructions text
+        this.add.text(640, 700, 'Use LEFT/RIGHT to move, SPACE to shoot, ESC for menu', {
+            fontSize: '20px',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
 
         // Start spawning answers
         this.time.addEvent({
             delay: 2000,
-            callback: this.spawnAnswers,
-            callbackScope: this,
+            callback: () => this.spawnAnswers(),
             loop: true
         });
     }
 
-    createPlayer() {
-        this.playerShip = this.add.sprite(640, 600, 'ship')
-            .setScale(0.8)
-            .setOrigin(0.5);
+    returnToMenu() {
+        // Clean up any running timers or events
+        this.clearAllAnswers();
         
+        // Return to the main menu
+        this.scene.start('MainMenuScene');
+    }
+
+    createPlayer() {
         // Add smooth movement controls
-        this.cursors = this.input.keyboard.createCursorKeys();
     }
 
     createUI() {
@@ -240,36 +348,32 @@ export default class GameScene extends Phaser.Scene {
     shoot() {
         const currentTime = this.time.now;
         if (currentTime - this.lastShootTime >= this.shootDelay) {
+            // Create bullet
             const bullet = this.add.sprite(this.playerShip.x, this.playerShip.y - 30, 'bullet')
                 .setScale(1)
                 .setOrigin(0.5);
             
-            bullet.speed = 400; // Add bullet speed property
+            bullet.speed = 400;
             this.bullets.push(bullet);
             this.lastShootTime = currentTime;
 
-            // Create shoot effect
-            const particles = this.add.particles(0, 0, 'particle', {
-                speed: 100,
-                scale: { start: 1, end: 0 },
-                blendMode: 'ADD',
-                lifespan: 200,
-            });
-
-            particles.createEmitter({
-                x: this.playerShip.x,
-                y: this.playerShip.y - 20,
-                quantity: 5,
-                speedY: { min: -100, max: -50 },
-                speedX: { min: -50, max: 50 },
+            // Create shooting particles
+            const particles = this.add.particles(this.playerShip.x, this.playerShip.y - 20, 'particle', {
+                speed: { min: 50, max: 100 },
+                angle: { min: 260, max: 280 },
                 scale: { start: 0.5, end: 0 },
                 lifespan: 200,
+                quantity: 5,
+                tint: 0x00ff00
             });
 
             // Clean up particles after animation
             this.time.delayedCall(200, () => {
                 particles.destroy();
             });
+
+            // Add camera shake for feedback
+            this.cameras.main.shake(50, 0.002);
         }
     }
 
@@ -289,6 +393,11 @@ export default class GameScene extends Phaser.Scene {
                 star.y = 0;
                 star.x = Phaser.Math.Between(0, this.game.config.width);
             }
+        }
+
+        // Handle shooting
+        if (this.spaceKey.isDown) {
+            this.shoot();
         }
 
         // Update bullets
